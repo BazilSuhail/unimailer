@@ -1,0 +1,110 @@
+{
+  "name": "unimailer",
+  "version": "1.0.0",
+  "description": "Modern, type-safe email library for Node.js, Bun, and Deno. SMTP + Resend transports with automatic failover, retry logic, and MIME encoding.",
+  "author": "bazil",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BazilSuhail/unimailer"
+  },
+  "keywords": [
+    "email",
+    "mailer",
+    "nodemailer",
+    "smtp",
+    "resend",
+    "transactional-email",
+    "email-library",
+    "email-sending",
+    "mime",
+    "multipart",
+    "email-transport",
+    "typescript",
+    "ts",
+    "failover",
+    "retry",
+    "email-api",
+    "email-service",
+    "bulk-email",
+    "email-queue",
+    "html-email",
+    "email-attachments",
+    "dkim",
+    "oauth2",
+    "bun",
+    "deno",
+    "nodejs",
+    "edge",
+    "serverless",
+    "react-email",
+    "email-validation",
+    "provider",
+    "multi-provider",
+    "resend-api",
+    "sendgrid",
+    "mailgun",
+    "aws-ses"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./smtp": {
+      "import": {
+        "types": "./dist/providers/smtp/index.d.ts",
+        "default": "./dist/providers/smtp/index.js"
+      },
+      "require": {
+        "types": "./dist/providers/smtp/index.d.cts",
+        "default": "./dist/providers/smtp/index.cjs"
+      }
+    },
+    "./resend": {
+      "import": {
+        "types": "./dist/providers/resend/index.d.ts",
+        "default": "./dist/providers/resend/index.js"
+      },
+      "require": {
+        "types": "./dist/providers/resend/index.d.cts",
+        "default": "./dist/providers/resend/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "oxlint src/",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "oxlint": "^1.79.0",
+    "tsup": "^8.4.0",
+    "typescript": "~5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/BazilSuhail"
+  }
+}
