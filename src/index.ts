@@ -22,3 +22,6 @@ export {
   encodeBase64Lines,
   guessMimeType,
 } from "./utils.js";
+
+export { signMessage, createDkimSigner } from "./dkim.js";
+export type { DkimOptions } from "./dkim.js";

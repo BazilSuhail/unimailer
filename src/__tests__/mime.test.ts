@@ -12,64 +12,64 @@ const msg = (overrides: Partial<EmailMessage> = {}): EmailMessage => ({
 
 describe("encodeMessage", () => {
   describe("headers", () => {
-    it("includes MIME-Version: 1.0", () => {
-      const result = encodeMessage(msg());
+    it("includes MIME-Version: 1.0", async () => {
+      const result = await encodeMessage(msg());
       expect(result).toContain("MIME-Version: 1.0");
     });
 
-    it("includes From header", () => {
-      const result = encodeMessage(msg());
+    it("includes From header", async () => {
+      const result = await encodeMessage(msg());
       expect(result).toContain("From: sender@example.com");
     });
 
-    it("includes To header", () => {
-      const result = encodeMessage(msg());
+    it("includes To header", async () => {
+      const result = await encodeMessage(msg());
       expect(result).toContain("To: recipient@example.com");
     });
 
-    it("includes Subject header", () => {
-      const result = encodeMessage(msg());
+    it("includes Subject header", async () => {
+      const result = await encodeMessage(msg());
       expect(result).toContain("Subject: Test Subject");
     });
 
-    it("includes Date header", () => {
-      const result = encodeMessage(msg());
+    it("includes Date header", async () => {
+      const result = await encodeMessage(msg());
       expect(result).toMatch(/Date: /);
     });
 
-    it("includes custom headers", () => {
-      const result = encodeMessage(
+    it("includes custom headers", async () => {
+      const result = await encodeMessage(
         msg({ headers: { "X-Campaign": "summer" } }),
       );
       expect(result).toContain("X-Campaign: summer");
     });
 
-    it("includes Reply-To header", () => {
-      const result = encodeMessage(
+    it("includes Reply-To header", async () => {
+      const result = await encodeMessage(
         msg({ replyTo: "reply@example.com" }),
       );
       expect(result).toContain("Reply-To: reply@example.com");
     });
 
-    it("includes Cc header", () => {
-      const result = encodeMessage(msg({ cc: "cc@example.com" }));
+    it("includes Cc header", async () => {
+      const result = await encodeMessage(msg({ cc: "cc@example.com" }));
       expect(result).toContain("Cc: cc@example.com");
     });
 
-    it("includes Bcc header", () => {
-      const result = encodeMessage(msg({ bcc: "bcc@example.com" }));
+    it("includes Bcc header", async () => {
+      const result = await encodeMessage(msg({ bcc: "bcc@example.com" }));
       expect(result).toContain("Bcc: bcc@example.com");
     });
 
-    it("formats from as name+address", () => {
-      const result = encodeMessage(
+    it("formats from as name+address", async () => {
+      const result = await encodeMessage(
         msg({ from: { name: "Alice", address: "a@b.com" } }),
       );
       expect(result).toContain("From: Alice <a@b.com>");
     });
 
-    it("formats to as array", () => {
-      const result = encodeMessage(
+    it("formats to as array", async () => {
+      const result = await encodeMessage(
         msg({ to: ["a@b.com", "c@d.com"] }),
       );
       expect(result).toContain("To: a@b.com, c@d.com");
@@ -77,8 +77,8 @@ describe("encodeMessage", () => {
   });
 
   describe("text-only", () => {
-    it("produces text/plain content type", () => {
-      const result = encodeMessage(msg({ text: "Plain text", html: undefined }));
+    it("produces text/plain content type", async () => {
+      const result = await encodeMessage(msg({ text: "Plain text", html: undefined }));
       expect(result).toContain('Content-Type: text/plain; charset="UTF-8"');
       expect(result).toContain("Content-Transfer-Encoding: 7bit");
       expect(result).toContain("Plain text");
@@ -86,8 +86,8 @@ describe("encodeMessage", () => {
   });
 
   describe("html-only", () => {
-    it("produces text/html content type", () => {
-      const result = encodeMessage(msg());
+    it("produces text/html content type", async () => {
+      const result = await encodeMessage(msg());
       expect(result).toContain('Content-Type: text/html; charset="UTF-8"');
       expect(result).toContain("Content-Transfer-Encoding: quoted-printable");
       expect(result).toContain("<p>Hello</p>");
@@ -95,8 +95,8 @@ describe("encodeMessage", () => {
   });
 
   describe("text + html (multipart/alternative)", () => {
-    it("wraps in multipart/alternative", () => {
-      const result = encodeMessage(
+    it("wraps in multipart/alternative", async () => {
+      const result = await encodeMessage(
         msg({ text: "Plain", html: "<p>Rich</p>" }),
       );
       expect(result).toContain("multipart/alternative");
@@ -104,8 +104,8 @@ describe("encodeMessage", () => {
       expect(result).toContain("text/html");
     });
 
-    it("text part comes before html part", () => {
-      const result = encodeMessage(
+    it("text part comes before html part", async () => {
+      const result = await encodeMessage(
         msg({ text: "Plain", html: "<p>Rich</p>" }),
       );
       const textIdx = result.indexOf("text/plain");
@@ -115,8 +115,8 @@ describe("encodeMessage", () => {
   });
 
   describe("attachments (multipart/mixed)", () => {
-    it("wraps in multipart/mixed when attachments present", () => {
-      const result = encodeMessage(
+    it("wraps in multipart/mixed when attachments present", async () => {
+      const result = await encodeMessage(
         msg({
           attachments: [
             { filename: "test.txt", content: Buffer.from("hello") },
@@ -126,8 +126,8 @@ describe("encodeMessage", () => {
       expect(result).toContain("multipart/mixed");
     });
 
-    it("includes attachment headers", () => {
-      const result = encodeMessage(
+    it("includes attachment headers", async () => {
+      const result = await encodeMessage(
         msg({
           attachments: [
             { filename: "test.txt", content: Buffer.from("hello") },
@@ -138,8 +138,8 @@ describe("encodeMessage", () => {
       expect(result).toContain('Content-Disposition: attachment; filename="test.txt"');
     });
 
-    it("uses custom contentType when provided", () => {
-      const result = encodeMessage(
+    it("uses custom contentType when provided", async () => {
+      const result = await encodeMessage(
         msg({
           attachments: [
             {
@@ -153,8 +153,8 @@ describe("encodeMessage", () => {
       expect(result).toContain("Content-Type: application/octet-stream");
     });
 
-    it("uses inline disposition for cid attachments", () => {
-      const result = encodeMessage(
+    it("uses inline disposition for cid attachments", async () => {
+      const result = await encodeMessage(
         msg({
           attachments: [
             {
@@ -169,8 +169,8 @@ describe("encodeMessage", () => {
       expect(result).toContain("Content-ID: <logo>");
     });
 
-    it("text + html + attachments produces nested multipart", () => {
-      const result = encodeMessage(
+    it("text + html + attachments produces nested multipart", async () => {
+      const result = await encodeMessage(
         msg({
           text: "Plain",
           html: "<p>Rich</p>",
@@ -182,11 +182,27 @@ describe("encodeMessage", () => {
       expect(result).toContain("multipart/mixed");
       expect(result).toContain("multipart/alternative");
     });
+
+    it("handles ReadableStream attachment content", async () => {
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("stream data"));
+          controller.close();
+        },
+      });
+      const result = await encodeMessage(
+        msg({
+          attachments: [{ filename: "stream.txt", content: stream }],
+        }),
+      );
+      expect(result).toContain("multipart/mixed");
+      expect(result).toContain('Content-Disposition: attachment; filename="stream.txt"');
+    });
   });
 
   describe("CRLF", () => {
-    it("uses CRLF line endings throughout", () => {
-      const result = encodeMessage(msg());
+    it("uses CRLF line endings throughout", async () => {
+      const result = await encodeMessage(msg());
       const lines = result.split("\r\n");
       expect(lines.length).toBeGreaterThan(1);
     });

@@ -2,7 +2,7 @@ export type EmailRecipient = string | { name: string; address: string };
 
 export interface Attachment {
   filename: string;
-  content?: string | Buffer | Uint8Array;
+  content?: string | Buffer | Uint8Array | ReadableStream<Uint8Array>;
   path?: string;
   contentType?: string;
   cid?: string;

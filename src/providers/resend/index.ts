@@ -70,21 +70,42 @@ export class ResendTransport implements Transport {
     if (message.headers) payload.headers = message.headers;
 
     if (message.attachments?.length) {
-      payload.attachments = message.attachments.map((att) => {
-        const content =
-          att.content instanceof Uint8Array
-            ? encodeBase64Lines(att.content)
-            : typeof att.content === "string"
-              ? att.content
-              : "";
+      payload.attachments = await Promise.all(
+        message.attachments.map(async (att) => {
+          let content: string;
 
-        return {
-          filename: att.filename,
-          content,
-          content_type: att.contentType,
-          content_id: att.cid,
-        };
-      });
+          if (att.content instanceof Uint8Array) {
+            content = encodeBase64Lines(att.content);
+          } else if (att.content instanceof ReadableStream) {
+            const reader = att.content.getReader();
+            const chunks: Uint8Array[] = [];
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value) chunks.push(value);
+            }
+            const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+            const bytes = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const c of chunks) {
+              bytes.set(c, offset);
+              offset += c.length;
+            }
+            content = encodeBase64Lines(bytes);
+          } else if (typeof att.content === "string") {
+            content = att.content;
+          } else {
+            content = "";
+          }
+
+          return {
+            filename: att.filename,
+            content,
+            content_type: att.contentType,
+            content_id: att.cid,
+          };
+        }),
+      );
     }
 
     const controller = new AbortController();

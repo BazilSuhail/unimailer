@@ -1,6 +1,6 @@
 {
   "name": "unimailer",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Modern, type-safe email library for Node.js, Bun, and Deno. SMTP + Resend transports with automatic failover, retry logic, and MIME encoding.",
   "author": "bazil",
   "license": "MIT",

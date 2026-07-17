@@ -33,16 +33,41 @@ function buildHtmlPart(html: string, boundary: string): string {
   ].join(CRLF);
 }
 
-function buildAttachmentPart(
+async function collectStream(
+  stream: ReadableStream<Uint8Array>,
+): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) chunks.push(value);
+  }
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
+async function buildAttachmentPart(
   att: Attachment,
   boundary: string,
-): string {
-  const contentBuffer =
-    att.content instanceof Uint8Array
-      ? att.content
-      : typeof att.content === "string"
-        ? Buffer.from(att.content, "base64")
-        : att.content ?? Buffer.alloc(0);
+): Promise<string> {
+  let contentBuffer: Uint8Array;
+
+  if (att.content instanceof Uint8Array) {
+    contentBuffer = att.content;
+  } else if (att.content instanceof ReadableStream) {
+    contentBuffer = await collectStream(att.content);
+  } else if (typeof att.content === "string") {
+    contentBuffer = Buffer.from(att.content, "base64");
+  } else {
+    contentBuffer = Buffer.alloc(0);
+  }
 
   const contentType = att.contentType ?? guessMimeType(att.filename);
   const contentId = att.cid
@@ -89,7 +114,7 @@ function buildHeaders(message: EmailMessage): string {
   return lines.join(CRLF);
 }
 
-export function encodeMessage(message: EmailMessage): string {
+export async function encodeMessage(message: EmailMessage): Promise<string> {
   const hasText = !!message.text;
   const hasHtml = !!message.html;
   const hasAttachments = !!message.attachments?.length;
@@ -170,7 +195,7 @@ export function encodeMessage(message: EmailMessage): string {
 
   if (hasAttachments) {
     for (const att of message.attachments!) {
-      parts.push(buildAttachmentPart(att, bodyBoundary));
+      parts.push(await buildAttachmentPart(att, bodyBoundary));
     }
   }
 
@@ -182,6 +207,6 @@ export function encodeMessage(message: EmailMessage): string {
   ].join(CRLF);
 }
 
-export function buildRawMime(message: EmailMessage): string {
+export async function buildRawMime(message: EmailMessage): Promise<string> {
   return encodeMessage(message);
 }

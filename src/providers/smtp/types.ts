@@ -33,6 +33,17 @@ export interface SmtpTransportOptions {
     rejectUnauthorized?: boolean;
     minVersion?: string;
   };
+  pool?: {
+    enabled: boolean;
+    maxConnections?: number;
+    idleTimeout?: number;
+  };
+  dkim?: {
+    domain: string;
+    selector: string;
+    privateKey: string;
+    headers?: string[];
+  };
 }
 
 export interface SmtpCommand {
