@@ -45,7 +45,7 @@ export function validateMessage(msg: unknown): EmailMessage {
   if (
     m.to === undefined ||
     m.to === null ||
-    (typeof m.to !== "string" && !Array.isArray(m.to)) ||
+    (typeof m.to !== "string" && !Array.isArray(m.to) && !isValidRecipient(m.to)) ||
     (Array.isArray(m.to) && m.to.length === 0) ||
     (typeof m.to === "string" && !isValidEmail(m.to)) ||
     (Array.isArray(m.to) && !m.to.every(isValidRecipient))
