@@ -2,17 +2,18 @@ import type { Transport, EmailMessage, SendResult } from "../../types.js";
 import { createSendError } from "../../transport.js";
 import { encodeBase64Lines } from "../../utils.js";
 
-export interface ResendTransportOptions {
+export interface SendGridTransportOptions {
   apiKey: string;
   baseUrl?: string;
   timeout?: number;
+  sandboxMode?: boolean;
 }
 
-function toResendAddress(
+function toSendGridAddress(
   addr: string | { name: string; address: string },
-): string {
-  if (typeof addr === "string") return addr;
-  return `${addr.name} <${addr.address}>`;
+): { email: string; name?: string } {
+  if (typeof addr === "string") return { email: addr };
+  return { email: addr.address, name: addr.name };
 }
 
 function toArray<T>(value: T | T[]): T[] {
@@ -39,33 +40,56 @@ async function collectStream(
   return result;
 }
 
-export class ResendTransport implements Transport {
-  readonly id = "resend";
+export class SendGridTransport implements Transport {
+  readonly id = "sendgrid";
   private apiKey: string;
   private baseUrl: string;
   private timeout: number;
+  private sandboxMode: boolean;
 
-  constructor(options: ResendTransportOptions) {
+  constructor(options: SendGridTransportOptions) {
     this.apiKey = options.apiKey;
-    this.baseUrl = options.baseUrl ?? "https://api.resend.com";
+    this.baseUrl = options.baseUrl ?? "https://api.sendgrid.com";
     this.timeout = options.timeout ?? 30000;
+    this.sandboxMode = options.sandboxMode ?? false;
   }
 
   async send(message: EmailMessage): Promise<SendResult> {
+    const personalizations: Record<string, unknown>[] = [
+      {
+        to: toArray(message.to).map(toSendGridAddress),
+      },
+    ];
+
+    if (message.cc) {
+      personalizations[0]!.cc = toArray(message.cc).map(toSendGridAddress);
+    }
+    if (message.bcc) {
+      personalizations[0]!.bcc = toArray(message.bcc).map(toSendGridAddress);
+    }
+    if (message.replyTo) {
+      personalizations[0]!.reply_to = toSendGridAddress(message.replyTo);
+    }
+    if (message.headers) {
+      personalizations[0]!.headers = message.headers;
+    }
+
     const payload: Record<string, unknown> = {
-      from: toResendAddress(message.from),
-      to: toArray(message.to).map(toResendAddress),
+      personalizations,
+      from: toSendGridAddress(message.from),
       subject: message.subject,
     };
 
-    if (message.cc) payload.cc = toArray(message.cc).map(toResendAddress);
-    if (message.bcc) payload.bcc = toArray(message.bcc).map(toResendAddress);
-    if (message.replyTo) {
-      payload.reply_to = [toResendAddress(message.replyTo)];
+    const content: { type: string; value: string }[] = [];
+    if (message.text) {
+      content.push({ type: "text/plain", value: message.text });
     }
-    if (message.html) payload.html = message.html;
-    if (message.text) payload.text = message.text;
-    if (message.headers) payload.headers = message.headers;
+    if (message.html) {
+      content.push({ type: "text/html", value: message.html });
+    }
+    if (content.length > 0) {
+      payload.content = content;
+    }
 
     if (message.attachments?.length) {
       payload.attachments = await Promise.all(
@@ -83,21 +107,27 @@ export class ResendTransport implements Transport {
             content = "";
           }
 
-          return {
-            filename: att.filename,
+          const attPayload: Record<string, unknown> = {
             content,
-            content_type: att.contentType,
-            content_id: att.cid,
+            filename: att.filename,
           };
+          if (att.contentType) attPayload.type = att.contentType;
+          if (att.cid) attPayload.disposition = "inline";
+
+          return attPayload;
         }),
       );
+    }
+
+    if (this.sandboxMode) {
+      payload.mail_settings = { sandbox_mode: { enable: true } };
     }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(`${this.baseUrl}/emails`, {
+      const response = await fetch(`${this.baseUrl}/v3/mail/send`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
@@ -109,22 +139,26 @@ export class ResendTransport implements Transport {
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        const errorBody = body as { message?: string; name?: string };
-        throw createSendError(
-          errorBody.message ?? `Resend API error: ${response.status}`,
-          this.id,
-          {
-            code: errorBody.name ?? "RESEND_API_ERROR",
-            statusCode: response.status,
-            retryable: response.status === 429 || response.status >= 500,
-          },
-        );
+        const errorBody = body as {
+          errors?: { message: string; field?: string; help?: unknown }[];
+          message?: string;
+        };
+        const errMsg =
+          errorBody.errors?.[0]?.message ??
+          errorBody.message ??
+          `SendGrid API error: ${response.status}`;
+        throw createSendError(errMsg, this.id, {
+          code: "SENDGRID_API_ERROR",
+          statusCode: response.status,
+          retryable: response.status === 429 || response.status >= 500,
+        });
       }
 
-      const result = (await response.json()) as { id: string };
+      const messageId =
+        response.headers.get("x-message-id") ?? `sg-${Date.now()}`;
 
       return {
-        messageId: result.id,
+        messageId,
         transportId: this.id,
         timestamp: new Date(),
       };
@@ -133,7 +167,7 @@ export class ResendTransport implements Transport {
 
       const error =
         err instanceof DOMException && err.name === "AbortError"
-          ? createSendError("Resend request timed out", this.id, {
+          ? createSendError("SendGrid request timed out", this.id, {
               code: "TIMEOUT",
               retryable: true,
             })

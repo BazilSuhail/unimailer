@@ -24,4 +24,18 @@ export default defineConfig([
     outDir: "dist/providers/resend",
     sourcemap: true,
   },
+  {
+    entry: ["src/providers/sendgrid/index.ts"],
+    format: ["esm", "cjs"],
+    dts: true,
+    outDir: "dist/providers/sendgrid",
+    sourcemap: true,
+  },
+  {
+    entry: ["src/providers/postmark/index.ts"],
+    format: ["esm", "cjs"],
+    dts: true,
+    outDir: "dist/providers/postmark",
+    sourcemap: true,
+  },
 ]);
