@@ -25,6 +25,7 @@ export interface SendResult {
   messageId: string;
   transportId: string;
   timestamp: Date;
+  rawMime?: string;
 }
 
 export interface SendError extends Error {

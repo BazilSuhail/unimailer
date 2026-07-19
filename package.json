@@ -1,6 +1,6 @@
 {
   "name": "unimailer",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Modern, multi-runtime email library for Node.js, Bun, Deno, and Edge. SMTP + HTTP providers with automatic failover, retry logic, DKIM signing, and MIME encoding.",
   "author": "bazil",
   "license": "MIT",

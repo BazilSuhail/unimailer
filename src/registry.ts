@@ -1,5 +1,5 @@
 import type { Transport, EmailMessage, SendResult } from "./types.js";
-import { Mailer } from "./transport.js";
+import { Mailer, type MailerOptions } from "./transport.js";
 import { FailoverMailer } from "./failover.js";
 import { withRetry } from "./retry.js";
 
@@ -8,7 +8,7 @@ export interface ProviderEntry {
   priority?: number;
 }
 
-export interface MailerConfig {
+export interface MailerConfig extends MailerOptions {
   providers: Transport[];
   retry?: {
     maxRetries?: number;
@@ -49,7 +49,14 @@ export function createMailer(config: MailerConfig): MailerInstance {
     transport = withRetry(transport, retryOpts);
   }
 
-  const mailer = new Mailer(transport);
+  const mailerOpts: MailerOptions = {
+    dryRun: config.dryRun,
+    inlineCss: config.inlineCss,
+    onSend: config.onSend,
+    onError: config.onError,
+  };
+
+  const mailer = new Mailer(transport, mailerOpts);
 
   return {
     send: (message: EmailMessage) => mailer.send(message),
