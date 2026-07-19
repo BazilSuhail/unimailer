@@ -38,3 +38,6 @@ export type { TemplateData, TemplateOptions } from "./template.js";
 
 export { DevSandbox } from "./dev-sandbox.js";
 export type { InterceptedEmail, DevSandboxOptions } from "./dev-sandbox.js";
+
+export { verifyWebhook, parseWebhookEvent } from "./webhook.js";
+export type { WebhookProvider, WebhookVerificationResult, WebhookEvent } from "./webhook.js";

@@ -38,4 +38,18 @@ export default defineConfig([
     outDir: "dist/providers/postmark",
     sourcemap: true,
   },
+  {
+    entry: ["src/providers/ses/index.ts"],
+    format: ["esm", "cjs"],
+    dts: true,
+    outDir: "dist/providers/ses",
+    sourcemap: true,
+  },
+  {
+    entry: ["src/providers/mailgun/index.ts"],
+    format: ["esm", "cjs"],
+    dts: true,
+    outDir: "dist/providers/mailgun",
+    sourcemap: true,
+  },
 ]);
