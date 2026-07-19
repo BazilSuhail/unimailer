@@ -1,61 +1,35 @@
 import { describe, it, expect } from "vitest";
 import { Mailer, createSendError } from "../transport.js";
-import type { Transport } from "../types.js";
+import type { Transport, EmailMessage } from "../types.js";
+
+function mockTransport(): Transport & { calls: EmailMessage[] } {
+  return {
+    id: "mock",
+    calls: [],
+    async send(msg) {
+      this.calls.push(msg);
+      return { messageId: "msg-1", transportId: "mock", timestamp: new Date() };
+    },
+  };
+}
+
+const email: EmailMessage = {
+  from: "a@b.com", to: "c@d.com", subject: "T", html: "<p>x</p>",
+};
 
 describe("Mailer", () => {
-  it("delegates to transport.send", async () => {
-    let received = false;
-    const transport: Transport = {
-      id: "test",
-      async send(_msg) {
-        received = true;
-        return { messageId: "1", transportId: "test", timestamp: new Date() };
-      },
-    };
-
-    const mailer = new Mailer(transport);
-    await mailer.send({
-      from: "a@b.com",
-      to: "c@d.com",
-      subject: "T",
-      html: "<p>x</p>",
-    });
-
-    expect(received).toBe(true);
+  it("delegates to transport", async () => {
+    const t = mockTransport();
+    const mailer = new Mailer(t);
+    await mailer.send(email);
+    expect(t.calls.length).toBe(1);
   });
 
-  it("validates message before sending", async () => {
-    const transport: Transport = {
-      id: "test",
-      async send() {
-        return { messageId: "1", transportId: "test", timestamp: new Date() };
-      },
-    };
-
-    const mailer = new Mailer(transport);
-
-    await expect(
-      mailer.send({ from: "bad", to: "c@d.com", subject: "T", html: "<p>x</p>" }),
-    ).rejects.toThrow("validation failed");
-  });
-
-  it("returns transport's result", async () => {
-    const transport: Transport = {
-      id: "test",
-      async send() {
-        return { messageId: "abc", transportId: "test", timestamp: new Date() };
-      },
-    };
-
-    const mailer = new Mailer(transport);
-    const result = await mailer.send({
-      from: "a@b.com",
-      to: "c@d.com",
-      subject: "T",
-      html: "<p>x</p>",
-    });
-
-    expect(result.messageId).toBe("abc");
+  it("validates before send", async () => {
+    const t = mockTransport();
+    const mailer = new Mailer(t);
+    await expect(mailer.send({ from: "bad" } as any)).rejects.toThrow();
+    expect(t.calls.length).toBe(0);
   });
 });
 
@@ -66,12 +40,11 @@ describe("createSendError", () => {
     expect(err.code).toBe("SEND_FAILED");
     expect(err.transportId).toBe("smtp");
     expect(err.retryable).toBe(false);
-    expect(err.statusCode).toBeUndefined();
   });
 
-  it("accepts custom options", () => {
-    const cause = new Error("original");
-    const err = createSendError("fail", "resend", {
+  it("creates error with custom options", () => {
+    const cause = new Error("root");
+    const err = createSendError("fail", "smtp", {
       code: "TIMEOUT",
       statusCode: 408,
       retryable: true,

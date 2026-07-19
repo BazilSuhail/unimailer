@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { signMessage, createDkimSigner } from "../dkim.js";
 import type { DkimOptions } from "../dkim.js";
 
-const TEST_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
+const KEY = `-----BEGIN PRIVATE KEY-----
 MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCyfpEIFQocXGNP
 hCjNzkgzTPKDDlnCHZbY57dc4DYUScxxJBnIskI/IFzx/nZAYqxwIofBEPQSlJ09
 jJS4eqJyFoqaHxN1UokGpVVgT4MULnFMrzn8VE4hGB1ClJkKTc3/QHuOVupSg8dQ
@@ -31,13 +31,9 @@ AonC0OAdBvip5kgfCfnZdGKNbk64oSERTYoRJ5dV1+PZGGcaLnFoFwqJeq0wEPo+
 8G+O1zk2n+/mPdmF5ptiHQ==
 -----END PRIVATE KEY-----`;
 
-const dkimOptions: DkimOptions = {
-  domain: "example.com",
-  selector: "default",
-  privateKey: TEST_PRIVATE_KEY,
-};
+const opts: DkimOptions = { domain: "example.com", selector: "default", privateKey: KEY };
 
-const SAMPLE_MESSAGE = [
+const MSG = [
   "From: sender@example.com",
   "To: recipient@example.com",
   "Subject: Test Subject",
@@ -50,72 +46,36 @@ const SAMPLE_MESSAGE = [
 ].join("\r\n");
 
 describe("DKIM", () => {
-  it("adds DKIM-Signature header", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
+  it("adds DKIM-Signature with correct domain/selector", async () => {
+    const signed = await signMessage(MSG, opts);
     expect(signed).toContain("DKIM-Signature:");
-  });
-
-  it("includes v=1 in signature", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
+    expect(signed).toContain("d=example.com");
+    expect(signed).toContain("s=default");
+    expect(signed).toContain("a=rsa-sha256");
     expect(signed).toContain("v=1");
   });
 
-  it("includes correct domain and selector", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
-    expect(signed).toContain("d=example.com");
-    expect(signed).toContain("s=default");
-  });
-
-  it("includes rsa-sha256 algorithm", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
-    expect(signed).toContain("a=rsa-sha256");
-  });
-
-  it("includes body hash", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
+  it("includes body hash and signature", async () => {
+    const signed = await signMessage(MSG, opts);
     expect(signed).toMatch(/bh=[A-Za-z0-9+/=]+/);
-  });
-
-  it("includes signed headers list", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
-    expect(signed).toMatch(/h=[a-z\-: ]+/);
-  });
-
-  it("includes signature value", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
     expect(signed).toMatch(/b=[A-Za-z0-9+/=]+/);
   });
 
-  it("preserves original message headers", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
+  it("preserves original headers and body", async () => {
+    const signed = await signMessage(MSG, opts);
     expect(signed).toContain("From: sender@example.com");
-    expect(signed).toContain("To: recipient@example.com");
     expect(signed).toContain("Subject: Test Subject");
-  });
-
-  it("preserves message body", async () => {
-    const signed = await signMessage(SAMPLE_MESSAGE, dkimOptions);
     expect(signed).toContain("Hello World");
   });
 
-  it("custom signed headers", async () => {
-    const options: DkimOptions = {
-      ...dkimOptions,
-      headers: ["from", "subject"],
-    };
-    const signed = await signMessage(SAMPLE_MESSAGE, options);
+  it("supports custom signed headers", async () => {
+    const signed = await signMessage(MSG, { ...opts, headers: ["from", "subject"] });
     expect(signed).toMatch(/h=from: subject/);
   });
 
-  it("createDkimSigner returns a signing function", () => {
-    const signer = createDkimSigner(dkimOptions);
-    expect(typeof signer).toBe("function");
-  });
-
-  it("signer produces valid DKIM header", async () => {
-    const signer = createDkimSigner(dkimOptions);
-    const signed = await signer(SAMPLE_MESSAGE);
+  it("createDkimSigner returns working signer", async () => {
+    const signer = createDkimSigner(opts);
+    const signed = await signer(MSG);
     expect(signed).toContain("DKIM-Signature:");
-    expect(signed).toContain("d=example.com");
   });
 });

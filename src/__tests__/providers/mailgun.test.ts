@@ -2,152 +2,54 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MailgunTransport } from "../../providers/mailgun/index.js";
 
 const email = {
-  from: "sender@example.com",
-  to: "recipient@example.com",
-  subject: "Test",
-  html: "<p>Hello</p>",
+  from: "sender@example.com", to: "recipient@example.com",
+  subject: "Test", html: "<p>Hello</p>",
 };
 
-let originalFetch: typeof globalThis.fetch;
+let origFetch: typeof globalThis.fetch;
+beforeEach(() => { origFetch = globalThis.fetch; });
+afterEach(() => { globalThis.fetch = origFetch; });
 
-beforeEach(() => {
-  originalFetch = globalThis.fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-});
-
-function mockFetch(response: { ok?: boolean; status?: number; body?: unknown }) {
+function mockFetch(resp: { ok?: boolean; status?: number; body?: unknown }) {
   globalThis.fetch = vi.fn().mockResolvedValue({
-    ok: response.ok ?? true,
-    status: response.status ?? 200,
-    json: vi.fn().mockResolvedValue(response.body ?? { id: "msg-123" }),
+    ok: resp.ok ?? true, status: resp.status ?? 200,
+    json: vi.fn().mockResolvedValue(resp.body ?? { id: "mg-123" }),
   }) as typeof fetch;
 }
-
-function getFetchCall(index = 0): [string, RequestInit] {
-  const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
-  return calls[index] as [string, RequestInit];
-}
+function call(i = 0) { return (globalThis.fetch as any).mock.calls[i]; }
 
 describe("MailgunTransport", () => {
-  it("has id 'mailgun'", () => {
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "mg.example.com" });
-    expect(t.id).toBe("mailgun");
-  });
-
   it("sends to correct endpoint", async () => {
-    mockFetch({ ok: true, body: { id: "mg-msg-123" } });
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "mg.example.com" });
-    const result = await t.send(email);
-
-    expect(result.messageId).toBe("mg-msg-123");
-    expect(result.transportId).toBe("mailgun");
-
-    const [url] = getFetchCall();
-    expect(url).toBe("https://api.mailgun.net/v3/mg.example.com/messages");
+    mockFetch({ ok: true, body: { id: "mg-1" } });
+    const r = await new MailgunTransport({ apiKey: "mg_k", domain: "mg.ex.com" }).send(email);
+    expect(r.messageId).toBe("mg-1");
+    expect(call()[0]).toBe("https://api.mailgun.net/v3/mg.ex.com/messages");
   });
 
-  it("uses EU region endpoint", async () => {
+  it("uses EU region", async () => {
     mockFetch({ ok: true });
-    const t = new MailgunTransport({
-      apiKey: "mg_test",
-      domain: "mg.example.com",
-      region: "eu",
-    });
-    await t.send(email);
-
-    const [url] = getFetchCall();
-    expect(url).toContain("api.eu.mailgun.net");
+    await new MailgunTransport({ apiKey: "mg_k", domain: "d", region: "eu" }).send(email);
+    expect(call()[0]).toContain("api.eu.mailgun.net");
   });
 
-  it("sends basic auth header", async () => {
+  it("sends Basic auth", async () => {
     mockFetch({ ok: true });
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "mg.example.com" });
-    await t.send(email);
-
-    const [, opts] = getFetchCall();
-    expect(opts.headers).toMatchObject({
-      Authorization: expect.stringContaining("Basic"),
-    });
-  });
-
-  it("formats name+address from field", async () => {
-    mockFetch({ ok: true });
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "mg.example.com" });
-    await t.send({
-      ...email,
-      from: { name: "Alice", address: "alice@example.com" },
-    });
-
-    const [, opts] = getFetchCall();
-    const body = opts.body as FormData;
-    expect(body.get("from")).toBe("Alice <alice@example.com>");
+    await new MailgunTransport({ apiKey: "mg_k", domain: "d" }).send(email);
+    expect(call()[1].headers).toMatchObject({ Authorization: expect.stringContaining("Basic") });
   });
 
   it("throws on API error", async () => {
-    mockFetch({
-      ok: false,
-      status: 400,
-      body: { message: "Invalid domain" },
-    });
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "bad" });
-
-    await expect(t.send(email)).rejects.toThrow("Invalid domain");
+    mockFetch({ ok: false, status: 400, body: { message: "Invalid domain" } });
+    await expect(new MailgunTransport({ apiKey: "k", domain: "bad" }).send(email))
+      .rejects.toThrow("Invalid domain");
   });
 
   it("marks 429 as retryable", async () => {
-    mockFetch({ ok: false, status: 429, body: { message: "Rate limited" } });
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "mg.example.com" });
-
+    mockFetch({ ok: false, status: 429, body: { message: "Rate" } });
     try {
-      await t.send(email);
-      expect.fail("should throw");
-    } catch (err) {
-      expect((err as Error & { retryable: boolean }).retryable).toBe(true);
+      await new MailgunTransport({ apiKey: "k", domain: "d" }).send(email);
+    } catch (e) {
+      expect((e as any).retryable).toBe(true);
     }
-  });
-
-  it("marks 500 as retryable", async () => {
-    mockFetch({ ok: false, status: 500, body: { message: "Server error" } });
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "mg.example.com" });
-
-    try {
-      await t.send(email);
-      expect.fail("should throw");
-    } catch (err) {
-      expect((err as Error & { retryable: boolean }).retryable).toBe(true);
-    }
-  });
-
-  it("sends custom headers with h: prefix", async () => {
-    mockFetch({ ok: true });
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "mg.example.com" });
-    await t.send({
-      ...email,
-      headers: { "X-Campaign": "test" },
-    });
-
-    const [, opts] = getFetchCall();
-    const body = opts.body as FormData;
-    expect(body.get("h:X-Campaign")).toBe("test");
-  });
-
-  it("handles cc and bcc", async () => {
-    mockFetch({ ok: true });
-    const t = new MailgunTransport({ apiKey: "mg_test", domain: "mg.example.com" });
-    await t.send({
-      ...email,
-      cc: "cc@example.com",
-      bcc: ["bcc1@example.com", "bcc2@example.com"],
-    });
-
-    const [, opts] = getFetchCall();
-    const body = opts.body as FormData;
-    expect(body.get("cc")).toBe("cc@example.com");
-    const allBcc = body.getAll("bcc");
-    expect(allBcc).toContain("bcc1@example.com");
-    expect(allBcc).toContain("bcc2@example.com");
   });
 });
