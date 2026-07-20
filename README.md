@@ -1083,6 +1083,25 @@ const error = createSendError("Connection failed", "smtp", {
 
 ---
 
+## Contributing
+
+```bash
+git clone https://github.com/BazilSuhail/unimailer.git
+cd unimailer
+npm install
+npm test          # run tests
+npm run lint      # lint with oxlint
+npm run typecheck # type-check with tsc
+npm run build     # build with tsup
+```
+
+- Zero runtime dependencies — keep it that way
+- All PRs must pass `tsc --noEmit`, `oxlint`, and `vitest`
+- Add tests for new features
+- Follow existing code style
+
+---
+
 ## License
 
 MIT - [Bazil Suhail](https://github.com/BazilSuhail)
