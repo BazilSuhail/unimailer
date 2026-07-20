@@ -2,6 +2,10 @@ import type { Transport, EmailMessage, SendResult } from "./types.js";
 import { Mailer, type MailerOptions } from "./transport.js";
 import { FailoverMailer } from "./failover.js";
 import { withRetry } from "./retry.js";
+import { withRateLimiter, type RateLimiterOptions } from "./middleware/rate-limiter.js";
+import { MailQueue, type QueueOptions } from "./middleware/queue.js";
+import { CircuitBreaker, type CircuitBreakerOptions } from "./middleware/circuit-breaker.js";
+import { MetricsCollector } from "./middleware/metrics.js";
 
 export interface ProviderEntry {
   transport: Transport;
@@ -17,12 +21,19 @@ export interface MailerConfig extends MailerOptions {
     backoffMultiplier?: number;
   } | false;
   failover?: boolean;
+  rateLimit?: RateLimiterOptions;
+  queue?: QueueOptions;
+  circuitBreaker?: CircuitBreakerOptions;
+  metrics?: boolean;
 }
 
 export interface MailerInstance {
   send(message: EmailMessage): Promise<SendResult>;
   transport: Transport;
   destroy?(): Promise<void>;
+  metrics?: MetricsCollector;
+  queue?: MailQueue;
+  circuitBreaker?: CircuitBreaker;
 }
 
 export function createMailer(config: MailerConfig): MailerInstance {
@@ -49,6 +60,29 @@ export function createMailer(config: MailerConfig): MailerInstance {
     transport = withRetry(transport, retryOpts);
   }
 
+  let metrics: MetricsCollector | undefined;
+  let queue: MailQueue | undefined;
+  let circuitBreaker: CircuitBreaker | undefined;
+
+  if (config.metrics) {
+    metrics = new MetricsCollector(transport);
+    transport = metrics;
+  }
+
+  if (config.circuitBreaker) {
+    circuitBreaker = new CircuitBreaker(transport, config.circuitBreaker);
+    transport = circuitBreaker;
+  }
+
+  if (config.rateLimit) {
+    transport = withRateLimiter(transport, config.rateLimit);
+  }
+
+  if (config.queue) {
+    queue = new MailQueue(transport, config.queue);
+    transport = queue;
+  }
+
   const mailerOpts: MailerOptions = {
     dryRun: config.dryRun,
     inlineCss: config.inlineCss,
@@ -58,10 +92,16 @@ export function createMailer(config: MailerConfig): MailerInstance {
 
   const mailer = new Mailer(transport, mailerOpts);
 
-  return {
+  const instance: MailerInstance = {
     send: (message: EmailMessage) => mailer.send(message),
     transport,
   };
+
+  if (metrics) instance.metrics = metrics;
+  if (queue) instance.queue = queue;
+  if (circuitBreaker) instance.circuitBreaker = circuitBreaker;
+
+  return instance;
 }
 
 export function sortProviders(

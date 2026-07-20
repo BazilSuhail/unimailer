@@ -41,3 +41,17 @@ export type { InterceptedEmail, DevSandboxOptions } from "./dev-sandbox.js";
 
 export { verifyWebhook, parseWebhookEvent } from "./webhook.js";
 export type { WebhookProvider, WebhookVerificationResult, WebhookEvent } from "./webhook.js";
+
+export {
+  withRateLimiter,
+  MailQueue,
+  CircuitBreaker,
+  MetricsCollector,
+} from "./middleware/index.js";
+export type {
+  RateLimiterOptions,
+  QueueOptions,
+  CircuitBreakerOptions,
+  CircuitState,
+  MetricsSnapshot,
+} from "./middleware/index.js";

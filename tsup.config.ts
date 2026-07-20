@@ -52,4 +52,11 @@ export default defineConfig([
     outDir: "dist/providers/mailgun",
     sourcemap: true,
   },
+  {
+    entry: ["src/middleware/index.ts"],
+    format: ["esm", "cjs"],
+    dts: true,
+    outDir: "dist/middleware",
+    sourcemap: true,
+  },
 ]);
